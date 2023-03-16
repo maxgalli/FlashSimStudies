@@ -10,6 +10,27 @@ mamba env create -f environment.yml
 
 then clone ```nflows``` and install it with the usual ```pip install -e .``` in case we need to edit it.
 
+## Electrons
+
+Instructions to run what was done by Filippo in wipfs.
+
+Extraction:
+
+```
+cd /work/gallim/SIMStudies/wipfs/extract/electrons
+root 
+root [0] .L extraction.C
+root [1] extraction()
+```
+which will save the ROOT files in the current directory.
+
+Preprocess:
+```
+cd /work/gallim/SIMStudies/wipfs/preproce/electrons
+python preprocessing.py
+```
+which will create a hdf5 file in ```/work/gallim/SIMStudies/wipfs/training/electrons```.
+
 ## Photons
 
 ### Dataset Preparation
