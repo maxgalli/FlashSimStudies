@@ -85,13 +85,12 @@ def main():
         for format in ["png", "pdf"]:
             fig.savefig(os.path.join(fig_output, v + "." + format))
     
-    # split into train, test, val in 60, 20, 20
+    # split into train, test, val in 60, 40
     train, test = train_test_split(df, test_size=0.4)
-    val, test = train_test_split(test, test_size=0.5)
-    print(len(train), len(val), len(test))
+    print(len(train), len(test))
     
     # dump to parquet
-    for name, df in zip(["train", "val", "test"], [train, val, test]):
+    for name, df in zip(["train",  "test"], [train, test]):
         df.to_parquet(os.path.join(output, name + ".parquet"), engine="fastparquet")
     
     # dump pipelines
