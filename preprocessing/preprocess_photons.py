@@ -48,6 +48,10 @@ pipelines = {
     ),
 }
 
+original_ranges = {
+    "RecoPho_r9": (0, 2),
+    "RecoPhoGenPho_ptratio": (0, 10),
+}
 
 def main():
     files = "extracted_photons/*.parquet"
