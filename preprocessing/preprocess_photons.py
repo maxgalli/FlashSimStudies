@@ -89,8 +89,8 @@ def main():
         for format in ["png", "pdf"]:
             fig.savefig(os.path.join(fig_output, v + "." + format))
     
-    # split into train, test, val in 60, 40
-    train, test = train_test_split(df, test_size=0.4)
+    # split into train, test, val in 80, 20
+    train, test = train_test_split(df, test_size=0.2)
     print(len(train), len(test))
     
     # dump to parquet
