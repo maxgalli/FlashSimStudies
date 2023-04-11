@@ -51,11 +51,32 @@ python extract_photons.py --executor dask
 At the moment of doing the training, nanoAOD with the SC quantities we added haven't been centrally produced, so we need to produce them ourselves. In order ot make the dataset we follow the same procedure described [here](https://gist.github.com/maxgalli/0886ec4290672ecf57031ac969c4ade5), which works with 10_6_26. 
 
 Input MiniAOD: [link](https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=prod%2Fglobal&input=dataset%3D%2FGJet_Pt-40toInf_DoubleEMEnriched_MGG-80toInf_TuneCP5_13TeV_Pythia8%2FRunIISummer20UL18MiniAOD-106X_upgrade2018_realistic_v11_L1v1-v3%2FMINIAODSIM)
+
 NanoAOD produced: [link](https://cmsweb.cern.ch/das/request?input=dataset%3D%2FGJet_Pt-40toInf_DoubleEMEnriched_MGG-80toInf_TuneCP5_13TeV_Pythia8%2Fgallim-crab_FlashSimPhotonSample-ee6432161e5c185bb80950ddbb7162c0%2FUSER&instance=prod/phys03)
 
 ### Preprocessing
 
+```
+cd preprocessing 
+python preprocess_photons.py
+```
+
+The script contains a dictionary of pipelines for each variable we want to preprocess. In ```preprocessed_photons``` the following objects are dumped:
+- train and test parquet files
+- ```pipelines.pkl```, a dictinoary containing a pipeline for each of the preprocessed variables
+- inside ```preprocessed_photons/figures```, variables before and after preprocessing are plotted side by side
+
 ### Training
+
+```
+python train_photons.py --config-name <config-name>
+```
+
+To use the multi-GPU training and also select which GPUs to use, the best way I found consists in specifying the GPUs to use through ```CUDA_VISIBLE_DEVICES```, e.g.:
+
+```
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train_photons.py --config-name cfg7
+```
 
 #### Configurations comments
 

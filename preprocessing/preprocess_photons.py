@@ -81,8 +81,6 @@ class Smearer(TransformerMixin, BaseEstimator):
         return self.find_closest_numbers(X, self.values).reshape(-1, 1)
 
 
-cond_variables = []
-
 pipelines = {
     "GenPho_pt": Pipeline(
         [
@@ -101,6 +99,7 @@ pipelines = {
     "GenPho_status": Pipeline(
         [("smearer", Smearer("uniform")), ("scaler", MinMaxScaler((-1, 1)))]
     ),
+    "GenPhoGenEle_deltar": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "RecoPho_r9": Pipeline(
         [
             (
@@ -173,6 +172,19 @@ pipelines = {
             ("scaler", MinMaxScaler((-1, 1))),
         ]
     ),
+    "RecoPho_s4": Pipeline(
+        [
+            (
+                "log_trans",
+                FunctionTransformer(
+                    lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                ),
+            ),
+            ("scaler", MinMaxScaler((0, 1))),
+        ]
+    ),
+    "RecoPho_sieip": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "RecoPho_x_calo": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
 }
 
 original_ranges = {
@@ -180,11 +192,15 @@ original_ranges = {
     "GenPho_eta": (-5, 5),
     "GenPho_phi": (-5, 5),
     "GenPho_status": (0, 45),
+    "GenPhoGenEle_deltar": (0, 15),
     "RecoPho_r9": (0, 2),
     "RecoPho_sieie": (0, 0.1),
     "RecoPho_energyErr": (0, 100),
     "RecoPhoGenPho_ptratio": (0, 10),
     "RecoPhoGenPho_deltaeta": (0, 3),
+    "RecoPho_s4": (0, 1),
+    "RecoPho_sieip": (-0.001, 0.001),
+    "RecoPho_x_calo": (-150, 150),
 }
 
 
