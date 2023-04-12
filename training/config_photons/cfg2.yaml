@@ -1,0 +1,50 @@
+hydra:
+  run:
+    dir: outputs/${hydra.job.config_name}-${now:%Y-%m-%d}-${now:%H-%M-%S}
+  job:
+    chdir: True
+train:
+  size: 3800000
+  path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/train.parquet
+  batch_size: 2048
+test:
+  size: 100000
+  path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/test.parquet
+  batch_size: 2048
+context_variables:
+  - GenPho_pt
+  - GenPho_eta
+  - GenPho_phi
+  - GenPho_status
+target_variables:
+  - RecoPho_r9
+  - RecoPhoGenPho_ptratio
+model:
+  maf:
+    num_steps: 6
+    num_transform_blocks: 3
+    dropout_probability: 0.0
+    use_residual_blocks: True
+    batch_norm: True
+    hidden_dim: 128
+  arqs:
+    num_steps: 20
+    num_transform_blocks: 7
+    dropout_probability: 0.1
+    use_residual_blocks: True
+    batch_norm: True
+    hidden_dim: 300
+    num_bins: 64
+    tail_bound: 3.0
+  activation: relu
+  init_identity: True
+  transform_type: rq-autoregressive
+distributed: True
+epochs: 200
+sample_every: 10
+checkpoint: /work/gallim/SIMStudies/FlashSimStudies/training/outputs/cfg2-2023-03-29-19-32-11
+optimizer:
+  learning_rate: 1e-5
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 1e-5
