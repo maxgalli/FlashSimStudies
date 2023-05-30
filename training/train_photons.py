@@ -50,29 +50,35 @@ def readable_allocated_memory(memory_bytes):
 
 
 class PhotonDataset(Dataset):
-    def __init__(self, parquet_file, context_variables, target_variables, rows=None):
+    def __init__(
+        self,
+        parquet_file,
+        context_variables,
+        target_variables,
+        device=None,
+        rows=None,
+    ):
         self.parquet_file = parquet_file
         self.context_variables = context_variables
         self.target_variables = target_variables
         self.all_variables = context_variables + target_variables
-        self.data = pd.read_parquet(
+        data = pd.read_parquet(
             parquet_file, columns=self.all_variables, engine="fastparquet"
         )
         if rows is not None:
-            self.data = self.data.iloc[:rows]
+            data = data.iloc[:rows]
+        self.target = data[target_variables].values
+        self.context = data[context_variables].values
+        if device is not None:
+            self.target = torch.tensor(self.target, dtype=torch.float32).to(device)
+            self.context = torch.tensor(self.context, dtype=torch.float32).to(device)
 
     def __len__(self):
-        return len(self.data)
+        assert len(self.context) == len(self.target)
+        return len(self.target)
 
     def __getitem__(self, idx):
-        context = torch.tensor(
-            self.data.iloc[idx][self.context_variables].values, dtype=torch.float32
-        )
-        target = torch.tensor(
-            self.data.iloc[idx][self.target_variables].values, dtype=torch.float32
-        )
-
-        return context, target
+        return self.context[idx], self.target[idx]
 
 
 def sample_and_plot(
