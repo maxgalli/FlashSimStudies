@@ -100,6 +100,29 @@ pipelines = {
         [("smearer", Smearer("uniform")), ("scaler", MinMaxScaler((-1, 1)))]
     ),
     "GenPhoGenEle_deltar": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "ClosestGenJet_pt": Pipeline(
+        [
+            (
+                "log_trans",
+                FunctionTransformer(
+                    lambda x: np.log1p(x * 0.01),
+                    inverse_func=lambda x: np.expm1(x) / 0.01,
+                ),
+            ),
+            ("scaler", MinMaxScaler((0, 1))),
+        ]
+    ),
+    "ClosestGenJet_mass": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "PU_gpudensity": Pipeline([("none", None)]),
+    "PU_nPU": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "PU_nTrueInt": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "PU_pudensity": Pipeline(
+        [
+            ("smearer", Smearer("uniform")), ("scaler", MinMaxScaler((0, 1)))
+        ]
+    ),
+    "PU_sumEOOT": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "PU_sumLOOT": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "RecoPho_r9": Pipeline(
         [
             (
@@ -193,6 +216,14 @@ original_ranges = {
     "GenPho_phi": (-5, 5),
     "GenPho_status": (0, 45),
     "GenPhoGenEle_deltar": (0, 15),
+    "ClosestGenJet_pt": (0, 300),
+    "ClosestGenJet_mass": (0, 40),
+    "PU_gpudensity": (0, 1),
+    "PU_nPU": (0, 100),
+    "PU_nTrueInt": (0, 100),
+    "PU_pudensity": (0, 10),
+    "PU_sumEOOT": (0, 1000),
+    "PU_sumLOOT": (0, 200),
     "RecoPho_r9": (0, 2),
     "RecoPho_sieie": (0, 0.1),
     "RecoPho_energyErr": (0, 100),
