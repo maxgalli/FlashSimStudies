@@ -14,12 +14,29 @@ import distributed
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
+class MaskMixin:
+    """ Mixin class for masking values in a numpy array
+    """
+    def __init__(self, mask_lower_bound=None, mask_upper_bound=None):
+        self.mask_lower_bound = mask_lower_bound
+        self.mask_upper_bound = mask_upper_bound
 
-class Smearer(TransformerMixin, BaseEstimator):
-    def __init__(self, kind):
+    def apply_mask(self, arr):
+        mask = np.ones(arr.shape[0], dtype=bool)
+        if self.mask_lower_bound is not None:
+            mask = mask & (arr >= np.asarray(self.mask_lower_bound)).reshape(-1)
+        if self.mask_upper_bound is not None:
+            mask = mask & (arr <= np.asarray(self.mask_upper_bound)).reshape(-1)
+        return mask
+
+
+class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
+    def __init__(self, kind, mask_lower_bound=None, mask_upper_bound=None):
         if kind not in ["gaus", "uniform"]:
             raise ValueError
         self.kind = kind
+        self.mask_lower_bound = mask_lower_bound
+        self.mask_upper_bound = mask_upper_bound
 
     def get_half_distances(self, arr):
         diffs = np.diff(arr)
@@ -45,6 +62,8 @@ class Smearer(TransformerMixin, BaseEstimator):
         return numbers[closest_indices]
 
     def fit(self, X, y=None):
+        self.mask = self.apply_mask(X)
+
         self.occurrences = self.count_occurrences(X)
         self.values = np.array(list(self.occurrences.keys()))
         self.half_distances = self.get_half_distances(
@@ -61,24 +80,56 @@ class Smearer(TransformerMixin, BaseEstimator):
 
     def transform(self, X, y=None):
         new_sub_arrs = []
+
         for idx, (number, occ) in enumerate(self.occurrences.items()):
             if self.kind == "uniform":
-                new_sub_arrs.append(
-                    np.random.uniform(
-                        low=self.half_distances[idx],
-                        high=self.half_distances[idx + 1],
-                        size=occ,
-                    )
+                smear = np.random.uniform(
+                    low=self.half_distances[idx],
+                    high=self.half_distances[idx + 1],
+                    size=occ,
                 )
             elif self.kind == "gaus":
-                scale = self.half_widths[idx] / 2
-                new_sub_arrs.append(np.random.normal(loc=number, scale=scale, size=occ))
-        arr = np.concatenate(new_sub_arrs).reshape(-1, 1)
-        np.random.shuffle(arr)
-        return arr
+                scale = self.half_widths[idx] / 8
+                smear = np.random.normal(loc=number, scale=scale, size=occ)
+
+            new_sub_arrs.append(smear)
+
+        new_sub_arrs = np.concatenate(new_sub_arrs).reshape(X.shape)
+        # applying smear for masked values and retaining original for others
+        X_transformed = np.where(self.mask.reshape(X.shape), new_sub_arrs, X)
+        return X_transformed
 
     def inverse_transform(self, X, y=None):
-        return self.find_closest_numbers(X, self.values).reshape(-1, 1)
+        # if self.kind == "uniform":
+        #    return np.where(self.mask[:, None], self.find_closest_numbers(X, self.values).reshape(-1, 1), X)
+        # elif self.kind == "gaus":
+        #    return np.where(self.mask, self.values, X)
+        return np.where(
+            self.mask.reshape(X.shape),
+            self.find_closest_numbers(X, self.values).reshape(-1, 1),
+            X,
+        )
+
+
+class Displacer(TransformerMixin, BaseEstimator, MaskMixin):
+    """ Move the minimum to where_to_displace
+    """
+    def __init__(self, mask_lower_bound=None, mask_upper_bound=None, where_to_displace=None):
+        self.mask_lower_bound = mask_lower_bound
+        self.mask_upper_bound = mask_upper_bound
+        self.where_to_displace = where_to_displace
+    
+    def fit(self, X, y=None):
+        self.mask = self.apply_mask(X)
+        return self 
+
+    def transform(self, X, y=None):
+        self.minimum = np.min(X[self.mask])
+        X_transformed = np.where(self.mask.reshape(X.shape), X - self.minimum + self.where_to_displace, X)
+        return X_transformed
+
+    def inverse_transform(self, X, y=None):
+        return np.where(self.mask.reshape(X.shape), X + self.minimum - self.where_to_displace, X)
 
 
 pipelines = {
@@ -117,9 +168,7 @@ pipelines = {
     "PU_nPU": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "PU_nTrueInt": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "PU_pudensity": Pipeline(
-        [
-            ("smearer", Smearer("uniform")), ("scaler", MinMaxScaler((0, 1)))
-        ]
+        [("smearer", Smearer("uniform")), ("scaler", MinMaxScaler((0, 1)))]
     ),
     "PU_sumEOOT": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "PU_sumLOOT": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
@@ -208,6 +257,52 @@ pipelines = {
     ),
     "RecoPho_sieip": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "RecoPho_x_calo": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "RecoPho_hoe": Pipeline([("none", None)]),
+    "RecoPho_mvaID": Pipeline([("none", None)]),
+    "RecoPho_eCorr": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
+    "RecoPho_pfRelIso03_all": Pipeline(
+        [
+            (
+                "add",
+                FunctionTransformer(
+                    lambda x: x + 1e-3, inverse_func=lambda x: x - 1e-3
+                ),
+            ),
+            ("box-cox", PowerTransformer(method="box-cox", standardize=False)),
+            ("scaler", MinMaxScaler((0, 1))),
+            (
+                "add_2",
+                FunctionTransformer(
+                    lambda x: np.where(x > 0, x + 0.1, x),
+                    inverse_func=lambda x: np.where(x > 0, x - 0.1, x),
+                ),
+            ),
+            ("smearer", Smearer("gaus", mask_upper_bound=0.1)),
+            ("scaler_2", MinMaxScaler((-1, 1))),
+        ]
+    ),
+    "RecoPho_pfRelIso03_chg": Pipeline(
+        [
+            (
+                "add",
+                FunctionTransformer(
+                    lambda x: x + 1e-3, inverse_func=lambda x: x - 1e-3
+                ),
+            ),
+            ("box-cox", PowerTransformer(method="box-cox", standardize=False)),
+            ("scaler", MinMaxScaler((0, 1))),
+            (
+                "add_2",
+                FunctionTransformer(
+                    lambda x: np.where(x > 0, x + 0.1, x),
+                    inverse_func=lambda x: np.where(x > 0, x - 0.1, x),
+                ),
+            ),
+            ("smearer", Smearer("gaus", mask_upper_bound=0.1)),
+            ("scaler_2", MinMaxScaler((-1, 1))),
+        ]
+    ),
+
 }
 
 original_ranges = {
@@ -232,6 +327,11 @@ original_ranges = {
     "RecoPho_s4": (0, 1),
     "RecoPho_sieip": (-0.001, 0.001),
     "RecoPho_x_calo": (-150, 150),
+    "RecoPho_hoe": (0, 1),
+    "RecoPho_mvaID": (-1, 1),
+    "RecoPho_eCorr": (0.9, 1.1),
+    "RecoPho_pfRelIso03_all": (0, 3),
+    "RecoPho_pfRelIso03_chg": (0, 1.5),
 }
 
 
@@ -267,7 +367,7 @@ def main():
         print(v)
         # plot untransformed and transformed side by side
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-        ax[0].hist(df[v], bins=100)
+        ax[0].hist(df[v], bins=100, range=original_ranges[v])
         df[v] = pipelines[v].fit_transform(df[v].values.reshape(-1, 1))
         ax[1].hist(df[v], bins=100)
         ax[0].set_xlabel(v)
