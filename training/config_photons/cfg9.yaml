@@ -1,0 +1,69 @@
+hydra:
+  run:
+    dir: outputs/${hydra.job.config_name}-${now:%Y-%m-%d}-${now:%H-%M-%S}
+  job:
+    chdir: True
+train:
+  #size: 1800000
+  size: 2048
+  path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/train.parquet
+  batch_size: 2048
+test:
+  #size: 10000
+  size: 2048
+  path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/test.parquet
+  batch_size: 2048
+context_variables:
+  - GenPho_pt
+  - GenPho_eta
+  - GenPho_phi
+  - GenPho_status
+  - ClosestGenJet_pt
+  - ClosestGenJet_mass
+  - PU_gpudensity
+  - PU_nPU
+  - PU_nTrueInt
+  - PU_pudensity
+  - PU_sumEOOT
+  - PU_sumLOOT
+target_variables:
+  - RecoPho_r9
+  - RecoPho_sieie
+  - RecoPho_energyErr
+  - RecoPhoGenPho_ptratio
+  - RecoPhoGenPho_deltaeta
+  - RecoPho_s4
+  - RecoPho_sieip
+  - RecoPho_x_calo
+  - RecoPho_mvaID
+model:
+  maf:
+    num_steps: 6
+    num_transform_blocks: 4
+    dropout_probability: 0.0
+    use_residual_blocks: True
+    batch_norm: True
+    hidden_dim: 64
+  arqs:
+    num_steps: 10
+    num_transform_blocks: 5
+    dropout_probability: 0.1
+    use_residual_blocks: True
+    batch_norm: True
+    hidden_dim: 300
+    num_bins: 32
+    tail_bound: 1.0
+  activation: relu
+  init_identity: True
+  transform_type: rq-autoregressive
+#distributed: True
+distributed: False
+#epochs: 600
+epochs: 20
+sample_every: 10
+checkpoint: null
+optimizer:
+  learning_rate: 1e-4
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 1e-5
