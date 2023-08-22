@@ -129,7 +129,7 @@ def sample_and_plot(
         )
         ax.set_xlabel(var)
         ax.legend()
-        if device == 0:
+        if device == 0 or type(device) != int:
             writer.add_figure(f"{var}_reco_sampled", fig, epoch)
 
     # plot after preprocessing back
@@ -169,7 +169,7 @@ def sample_and_plot(
         )
         ax.set_xlabel(var)
         ax.legend()
-        if device == 0:
+        if device == 0 or type(device) != int:
             writer.add_figure(f"{var}_reco_sampled_back", fig, epoch)
 
 
@@ -221,14 +221,17 @@ def train(device, cfg, world_size=None, device_ids=None):
     model = create_mixture_flow_model(**flow_params_dct).to(device)
     if cfg.checkpoint is not None:
         # assume that the checkpoint is path to a directory
-        model, _, _, start_epoch, _, _ = load_mixture_model(
+        model, _, _, start_epoch, th, _ = load_mixture_model(
             model, model_dir=cfg.checkpoint, filename="checkpoint-latest.pt"
         )
         model = model.to(device)
+        best_train_loss = np.min(th)
         print("Loaded model from checkpoint: ", cfg.checkpoint)
         print("Resuming from epoch ", start_epoch)
+        print("Best train loss found to be: ", best_train_loss)
     else:
         start_epoch = 1
+        best_train_loss = 10000000
     # print(f"Memory allocated on device {device_id} after creating model: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
 
     if world_size is not None:
@@ -249,7 +252,8 @@ def train(device, cfg, world_size=None, device_ids=None):
         cfg.train.path,
         cfg.context_variables,
         cfg.target_variables,
-        cfg.train.size,
+        device=device,
+        rows=cfg.train.size,
     )
     train_loader = DataLoader(
         train_dataset,
@@ -257,20 +261,21 @@ def train(device, cfg, world_size=None, device_ids=None):
         shuffle=False if world_size is not None else True,
         sampler=DistributedSampler(train_dataset) if world_size is not None else None,
         # num_workers=2,
-        pin_memory=True,
+        #pin_memory=True,
     )
     test_dataset = PhotonDataset(
         cfg.test.path,
         cfg.context_variables,
         cfg.target_variables,
-        cfg.test.size,
+        device=device,
+        rows=cfg.test.size,
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=cfg.test.batch_size,
         shuffle=False,
         # num_workers=2,
-        pin_memory=True,
+        #pin_memory=True,
     )
     # print(f"Memory allocated on device {device_id} after creating datasets: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
 
@@ -348,7 +353,7 @@ def train(device, cfg, world_size=None, device_ids=None):
         # if world_size is not None:
         #    epoch_test_loss *= world_size
         test_history.append(epoch_test_loss)
-        if device == 0:
+        if device == 0 or world_size is None:
             writer.add_scalars(
                 "Losses", {"train": epoch_train_loss, "val": epoch_test_loss}, epoch
             )
@@ -371,19 +376,37 @@ def train(device, cfg, world_size=None, device_ids=None):
         print(
             f"Epoch {epoch} | GPU{device_id} | Rank {device} - train loss: {epoch_train_loss:.4f} - val loss: {epoch_test_loss:.4f} - time: {duration:.2f}s"
         )
-        if device == 0:
+
+        if device == 0 or world_size is None:
             save_model(
                 epoch,
                 ddp_model,
                 scheduler,
                 train_history,
                 test_history,
-                name="model",
+                name="checkpoint-latest.pt",
                 model_dir=".",
                 optimizer=optimizer,
                 is_ddp=world_size is not None,
             )
+        
+        if epoch_train_loss < best_train_loss:
+            print("New best train loss, saving model...")
+            best_train_loss = epoch_train_loss
+            if device == 0 or world_size is None:
+                save_model(
+                    epoch,
+                    ddp_model,
+                    scheduler,
+                    train_history,
+                    test_history,
+                    name="best_train_loss.pt",
+                    model_dir=".",
+                    optimizer=optimizer,
+                    is_ddp=world_size is not None,
+                )
 
+    writer.close()
 
 @hydra.main(version_base=None, config_path="config_photons", config_name="cfg0")
 def main(cfg):
