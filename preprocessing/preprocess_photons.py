@@ -14,9 +14,10 @@ import distributed
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
+
 class MaskMixin:
-    """ Mixin class for masking values in a numpy array
-    """
+    """Mixin class for masking values in a numpy array"""
+
     def __init__(self, mask_lower_bound=None, mask_upper_bound=None):
         self.mask_lower_bound = mask_lower_bound
         self.mask_upper_bound = mask_upper_bound
@@ -53,7 +54,10 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
     def count_occurrences(self, arr):
         unique_values = np.unique(arr).astype("int64")
         counts = np.bincount(arr.astype("int64")[:, 0])
-        return dict(zip(unique_values, counts[unique_values]))
+        dct = dict(zip(unique_values, counts[unique_values]))
+        # order by key
+        dct = dict(sorted(dct.items()))
+        return dct
 
     def find_closest_numbers(self, sample, numbers):
         closest_indices = np.argmin(
@@ -62,8 +66,6 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
         return numbers[closest_indices]
 
     def fit(self, X, y=None):
-        self.mask = self.apply_mask(X)
-
         self.occurrences = self.count_occurrences(X)
         self.values = np.array(list(self.occurrences.keys()))
         self.half_distances = self.get_half_distances(
@@ -79,6 +81,8 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
         return self
 
     def transform(self, X, y=None):
+        self.mask = self.apply_mask(X).reshape(X.shape)
+        
         new_sub_arrs = []
 
         for idx, (number, occ) in enumerate(self.occurrences.items()):
@@ -95,41 +99,50 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
             new_sub_arrs.append(smear)
 
         new_sub_arrs = np.concatenate(new_sub_arrs).reshape(X.shape)
+        new_sub_arrs = np.sort(new_sub_arrs, axis=0)
+        order = np.argsort(np.argsort(X, axis=0), axis=0).reshape(-1)
+        new_sub_arrs = new_sub_arrs[order].reshape(X.shape)
+
         # applying smear for masked values and retaining original for others
-        X_transformed = np.where(self.mask.reshape(X.shape), new_sub_arrs, X)
+        X_transformed = np.where(self.mask, new_sub_arrs, X)
+
         return X_transformed
 
     def inverse_transform(self, X, y=None):
-        # if self.kind == "uniform":
-        #    return np.where(self.mask[:, None], self.find_closest_numbers(X, self.values).reshape(-1, 1), X)
-        # elif self.kind == "gaus":
-        #    return np.where(self.mask, self.values, X)
+        self.mask = self.apply_mask(X).reshape(X.shape)
         return np.where(
-            self.mask.reshape(X.shape),
+            self.mask,
             self.find_closest_numbers(X, self.values).reshape(-1, 1),
             X,
         )
 
 
 class Displacer(TransformerMixin, BaseEstimator, MaskMixin):
-    """ Move the minimum to where_to_displace
-    """
-    def __init__(self, mask_lower_bound=None, mask_upper_bound=None, where_to_displace=None):
+    """Move the minimum to where_to_displace"""
+
+    def __init__(
+        self, mask_lower_bound=None, mask_upper_bound=None, where_to_displace=None
+    ):
         self.mask_lower_bound = mask_lower_bound
         self.mask_upper_bound = mask_upper_bound
         self.where_to_displace = where_to_displace
-    
+
     def fit(self, X, y=None):
-        self.mask = self.apply_mask(X)
-        return self 
+        return self
 
     def transform(self, X, y=None):
+        self.mask = self.apply_mask(X).reshape(X.shape)
         self.minimum = np.min(X[self.mask])
-        X_transformed = np.where(self.mask.reshape(X.shape), X - self.minimum + self.where_to_displace, X)
+        X_transformed = np.where(
+            self.mask, X - self.minimum + self.where_to_displace, X
+        )
         return X_transformed
 
     def inverse_transform(self, X, y=None):
-        return np.where(self.mask.reshape(X.shape), X + self.minimum - self.where_to_displace, X)
+        self.mask = self.apply_mask(X).reshape(X.shape)
+        return np.where(
+            self.mask, X + self.minimum - self.where_to_displace, X
+        )
 
 
 pipelines = {
@@ -270,14 +283,9 @@ pipelines = {
             ),
             ("box-cox", PowerTransformer(method="box-cox", standardize=False)),
             ("scaler", MinMaxScaler((0, 1))),
-            (
-                "add_2",
-                FunctionTransformer(
-                    lambda x: np.where(x > 0, x + 0.1, x),
-                    inverse_func=lambda x: np.where(x > 0, x - 0.1, x),
-                ),
-            ),
-            ("smearer", Smearer("gaus", mask_upper_bound=0.1)),
+            ("displacer", Displacer(mask_lower_bound=0.01, where_to_displace=1)),
+            ("smearer", Smearer("uniform", mask_upper_bound=1.0)),
+            ("displacer_2", Displacer(mask_lower_bound=1.0, where_to_displace=0.5)),
             ("scaler_2", MinMaxScaler((-1, 1))),
         ]
     ),
@@ -291,18 +299,26 @@ pipelines = {
             ),
             ("box-cox", PowerTransformer(method="box-cox", standardize=False)),
             ("scaler", MinMaxScaler((0, 1))),
-            (
-                "add_2",
-                FunctionTransformer(
-                    lambda x: np.where(x > 0, x + 0.1, x),
-                    inverse_func=lambda x: np.where(x > 0, x - 0.1, x),
-                ),
-            ),
-            ("smearer", Smearer("gaus", mask_upper_bound=0.1)),
+            ("displacer", Displacer(mask_lower_bound=0.01, where_to_displace=1)),
+            ("smearer", Smearer("uniform", mask_upper_bound=1.0)),
+            ("displacer_2", Displacer(mask_lower_bound=1.0, where_to_displace=0.5)),
             ("scaler_2", MinMaxScaler((-1, 1))),
         ]
     ),
-
+    "RecoPho_esEffSigmaRR": Pipeline(
+        [
+            (
+                "qt",
+                QuantileTransformer(
+                    n_quantiles=1000, output_distribution="normal", random_state=0
+                ),
+            ),
+            ("scaler", MinMaxScaler((0, 1))),
+            ("displacer", Displacer(mask_lower_bound=0.5, where_to_displace=1)),
+            ("smearer", Smearer("uniform", mask_upper_bound=0.5)),
+            ("displacer_2", Displacer(mask_lower_bound=1, where_to_displace=0.5)),
+        ]
+    ),
 }
 
 original_ranges = {
@@ -332,6 +348,7 @@ original_ranges = {
     "RecoPho_eCorr": (0.9, 1.1),
     "RecoPho_pfRelIso03_all": (0, 3),
     "RecoPho_pfRelIso03_chg": (0, 1.5),
+    "RecoPho_esEffSigmaRR": (0, 20),
 }
 
 
