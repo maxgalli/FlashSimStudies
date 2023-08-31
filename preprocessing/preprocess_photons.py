@@ -270,7 +270,17 @@ pipelines = {
     ),
     "RecoPho_sieip": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "RecoPho_x_calo": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
-    "RecoPho_hoe": Pipeline([("none", None)]),
+    "RecoPho_hoe": Pipeline(
+        [
+            ('scaler', MinMaxScaler((0.1, 5))),
+            ('log', FunctionTransformer(lambda x: np.log(x + 1e-3), inverse_func=lambda x: np.exp(x) - 1e-3)),
+            ('scaler2', MinMaxScaler((0, 10))),
+            ('displacer', Displacer(mask_lower_bound=0.1, where_to_displace=1)),
+            ('smearer', Smearer('uniform', mask_upper_bound=1.0)),
+            ('displacer2', Displacer(mask_lower_bound=1, where_to_displace=0.5)),
+            ('scaler3', MinMaxScaler((-1., 1.))),
+        ]
+    ),
     "RecoPho_mvaID": Pipeline([("none", None)]),
     "RecoPho_eCorr": Pipeline([("scaler", MinMaxScaler((-1, 1)))]),
     "RecoPho_pfRelIso03_all": Pipeline(
@@ -343,7 +353,7 @@ original_ranges = {
     "RecoPho_s4": (0, 1),
     "RecoPho_sieip": (-0.001, 0.001),
     "RecoPho_x_calo": (-150, 150),
-    "RecoPho_hoe": (0, 1),
+    "RecoPho_hoe": (0, 2),
     "RecoPho_mvaID": (-1, 1),
     "RecoPho_eCorr": (0.9, 1.1),
     "RecoPho_pfRelIso03_all": (0, 3),
