@@ -49,7 +49,8 @@ model:
 distributed: True
 epochs: 500
 sample_every: 10
-checkpoint: /work/gallim/SIMStudies/FlashSimStudies/training/outputs/cfg7-2023-04-09-16-54-26
+#checkpoint: /work/gallim/SIMStudies/FlashSimStudies/training/outputs/cfg7-2023-04-09-16-54-26
+checkpoint: /work/gallim/SIMStudies/FlashSimStudies/training/outputs/cfg7-2023-04-11-08-58-07
 optimizer:
   learning_rate: 1e-4
   beta1: 0.9

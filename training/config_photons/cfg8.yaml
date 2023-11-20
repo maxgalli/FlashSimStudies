@@ -4,12 +4,10 @@ hydra:
   job:
     chdir: True
 train:
-  #size: 1800000
-  size: 1800
+  size: 1800000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/train.parquet
   batch_size: 2048
 test:
-  #size: 100000
   size: 10000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/test.parquet
   batch_size: 2048
@@ -35,23 +33,19 @@ target_variables:
   - RecoPho_s4
   - RecoPho_sieip
   - RecoPho_x_calo
-  - RecoPho_mvaID
-  - RecoPho_eCorr
-  - RecoPho_pfRelIso03_all
-  - RecoPho_pfRelIso03_chg
-  - RecoPho_esEffSigmaRR
   - RecoPho_hoe
+  - RecoPho_mvaID
 model:
   maf:
     num_steps: 6
-    num_transform_blocks: 4
+    num_transform_blocks: 3
     dropout_probability: 0.0
     use_residual_blocks: True
     batch_norm: True
     hidden_dim: 64
   arqs:
     num_steps: 10
-    num_transform_blocks: 5
+    num_transform_blocks: 4
     dropout_probability: 0.1
     use_residual_blocks: True
     batch_norm: True
@@ -61,16 +55,12 @@ model:
   activation: relu
   init_identity: True
   transform_type: rq-autoregressive
-distributed: False
-#epochs: 900
-epochs: 5
-sample_every: 2
+distributed: True
+epochs: 600
+sample_every: 10
 checkpoint: null
 optimizer:
   learning_rate: 1e-4
   beta1: 0.9
   beta2: 0.999
   weight_decay: 1e-5
-stopper:
-  patience: 30
-  min_delta: 0.05

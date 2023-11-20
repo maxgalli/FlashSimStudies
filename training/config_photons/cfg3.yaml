@@ -4,73 +4,47 @@ hydra:
   job:
     chdir: True
 train:
-  #size: 1800000
-  size: 1800
+  size: 3800000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/train.parquet
-  batch_size: 2048
+  batch_size: 4096
 test:
-  #size: 100000
-  size: 10000
+  size: 100000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/test.parquet
-  batch_size: 2048
+  batch_size: 50000
 context_variables:
   - GenPho_pt
   - GenPho_eta
   - GenPho_phi
   - GenPho_status
-  - ClosestGenJet_pt
-  - ClosestGenJet_mass
-  - PU_gpudensity
-  - PU_nPU
-  - PU_nTrueInt
-  - PU_pudensity
-  - PU_sumEOOT
-  - PU_sumLOOT
 target_variables:
   - RecoPho_r9
-  - RecoPho_sieie
-  - RecoPho_energyErr
   - RecoPhoGenPho_ptratio
-  - RecoPhoGenPho_deltaeta
-  - RecoPho_s4
-  - RecoPho_sieip
-  - RecoPho_x_calo
-  - RecoPho_mvaID
-  - RecoPho_eCorr
-  - RecoPho_pfRelIso03_all
-  - RecoPho_pfRelIso03_chg
-  - RecoPho_esEffSigmaRR
-  - RecoPho_hoe
 model:
   maf:
     num_steps: 6
-    num_transform_blocks: 4
+    num_transform_blocks: 3
     dropout_probability: 0.0
     use_residual_blocks: True
     batch_norm: True
-    hidden_dim: 64
+    hidden_dim: 128
   arqs:
-    num_steps: 10
-    num_transform_blocks: 5
+    num_steps: 20
+    num_transform_blocks: 7
     dropout_probability: 0.1
     use_residual_blocks: True
     batch_norm: True
     hidden_dim: 300
-    num_bins: 32
-    tail_bound: 1.0
+    num_bins: 64
+    tail_bound: 3.0
   activation: relu
   init_identity: True
   transform_type: rq-autoregressive
-distributed: False
-#epochs: 900
-epochs: 5
-sample_every: 2
+distributed: True
+epochs: 200
+sample_every: 10
 checkpoint: null
 optimizer:
-  learning_rate: 1e-4
+  learning_rate: 1e-3
   beta1: 0.9
   beta2: 0.999
   weight_decay: 1e-5
-stopper:
-  patience: 30
-  min_delta: 0.05

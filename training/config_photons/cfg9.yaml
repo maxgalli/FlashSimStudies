@@ -4,13 +4,11 @@ hydra:
   job:
     chdir: True
 train:
-  #size: 1800000
-  size: 2048
+  size: 1800000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/train.parquet
   batch_size: 2048
 test:
-  #size: 10000
-  size: 2048
+  size: 10000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/test.parquet
   batch_size: 2048
 context_variables:
@@ -56,10 +54,8 @@ model:
   activation: relu
   init_identity: True
   transform_type: rq-autoregressive
-#distributed: True
-distributed: False
-#epochs: 600
-epochs: 20
+distributed: True
+epochs: 600
 sample_every: 10
 checkpoint: null
 optimizer:

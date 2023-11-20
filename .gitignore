@@ -1,2 +1,40 @@
 training/jobs/*.err
 training/jobs/*.out
+
+# Python
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter
+**/.ipynb_checkpoints/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
+*.pyc
+*.pyo
+*.egg-info/
+
+# OS generated files
+.DS_Store
+Thumbs.db
