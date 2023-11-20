@@ -13,6 +13,7 @@ test:
   size: 10000
   path: /work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/test.parquet
   batch_size: 2048
+pipe: pipe0
 context_variables:
   - GenPho_pt
   - GenPho_eta

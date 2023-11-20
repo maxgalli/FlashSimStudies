@@ -1,5 +1,8 @@
 training/jobs/*.err
 training/jobs/*.out
+jobs/*.err
+jobs/*.out
+ForMattia
 
 # Python
 *.py[cod]
