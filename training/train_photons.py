@@ -15,12 +15,15 @@ from scipy.stats import wasserstein_distance
 import matplotlib.pyplot as plt
 import pickle as pkl
 from comet_ml import Experiment
+import mplhep as hep
 
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from torch.profiler import profile, record_function, ProfilerActivity
+
+hep.style.use("CMS")
 
 # where wipfs modules are
 sys.path.append("/work/gallim/SIMStudies/wipfs/models")
@@ -109,6 +112,107 @@ class PhotonDataset(Dataset):
     def __getitem__(self, idx):
         return self.context[idx], self.target[idx]
 
+        
+class EarlyStopping:
+    def __init__(self, patience=5, min_delta=1):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_loss = 10e10
+        self.early_stop = False
+
+    def __call__(self, val_loss):
+        relative_loss = (self.best_loss - val_loss) / self.best_loss * 100
+        if relative_loss > self.min_delta:
+            self.best_loss = val_loss
+            self.counter = 0
+        elif relative_loss < self.min_delta:
+            self.counter += 1
+            print.info(
+                f"Early stopping counter: {self.counter} out of {self.patience}"
+            )
+            if self.counter >= self.patience:
+                print.info("Early stopping")
+                self.early_stop = True
+
+
+def dump_main_plot(
+    arr1,
+    arr2,
+    var_name,
+    nbins,
+    range,
+    labels,
+):
+    fig, (up, down) = plt.subplots(
+        nrows=2,
+        ncols=1,
+        gridspec_kw={"height_ratios": (2, 1)},
+        sharex=True,
+    )
+
+    color1 = "g"
+    color2 = "b"
+    arr1_hist, edges = np.histogram(arr1, bins=nbins, range=range)
+    centers = (edges[1:] + edges[:-1]) / 2
+    arr1_hist_norm, _, _ = up.hist(
+        arr1, bins=nbins, range=range, density=True, label=labels[0], histtype="step", color=color1
+    )
+    arr1_err_norm = np.sqrt(arr1_hist) / (np.diff(edges) * len(arr1))
+    up.errorbar(
+        centers,
+        arr1_hist_norm,
+        yerr=arr1_err_norm,
+        color=color1,
+        marker="",
+        linestyle="",
+    ) 
+    arr2_hist, _ = np.histogram(arr2, bins=nbins, range=range)
+    arr2_hist_norm, _, _ = up.hist(
+        arr2, bins=nbins, range=range, density=True, label=labels[1], histtype="step", color=color2
+    )
+    arr2_err_norm = np.sqrt(arr2_hist) / (np.diff(edges) * len(arr2))
+    up.errorbar(
+        centers,
+        arr2_hist_norm,
+        yerr=arr2_err_norm,
+        color=color2,
+        marker="",
+        linestyle="",
+    )
+
+    ratio_hist = arr1_hist_norm / arr2_hist_norm
+    ratio_err = np.sqrt((arr1_err_norm / arr1_hist_norm) ** 2 + (arr2_err_norm / arr2_hist_norm) ** 2) * ratio_hist
+    down.errorbar(
+        centers,
+        ratio_hist,
+        yerr=ratio_err,
+        color="k",
+        marker="o",
+        linestyle="",
+    )    
+
+    # cosmetics
+    up.set_ylabel("Normalized yield")
+    down.set_ylabel("Ratio")
+    down.set_xlabel(var_name)
+    up.set_xlim(range[0], range[1])
+    down.set_ylim(0.5, 1.5)
+    down.axhline(
+        1,
+        color="grey",
+        linestyle="--",
+    )
+    y_minor_ticks = np.arange(0.5, 1.5, 0.1)
+    down.set_yticks(y_minor_ticks, minor=True)
+    down.grid(True, alpha=0.4, which="minor")
+    up.legend()
+    hep.cms.label(
+        loc=0, data=True, llabel="Work in Progress", rlabel="", ax=up, pad=0.05
+    )
+
+    return fig, (up, down)
+
 
 def sample_and_plot(
     test_loader,
@@ -116,7 +220,6 @@ def sample_and_plot(
     epoch,
     writer,
     comet_logger,
-    save_dir,
     context_variables,
     target_variables,
     device,
@@ -147,20 +250,16 @@ def sample_and_plot(
     for var in target_variables:
         mn = min(reco[var].min(), samples[var].min())
         mx = max(reco[var].max(), samples[var].max())
-        fig, ax = plt.subplots(1, 1, figsize=(15, 10), tight_layout=True)
-        ax.hist(reco[var], bins=100, histtype="step", label="reco", range=(mn, mx))
-        ws = wasserstein_distance(reco[var], samples[var])
-        ax.hist(
+        fig, ax = dump_main_plot(
+            reco[var],
             samples[var],
-            bins=100,
-            histtype="step",
-            label=f"sampled (wasserstein={ws:.3f})",
-            range=(mn, mx),
+            var,
+            100,
+            (mn, mx),
+            ["reco", "sampled"], 
         )
-        ax.set_xlabel(var)
-        ax.legend()
         if device == 0 or type(device) != int:
-            fig_name = f"{var}_reco_sampled.png"
+            fig_name = f"{var}_reco_sampled_transformed.png"
             writer.add_figure(fig_name, fig, epoch)
             comet_logger.log_figure(fig_name, fig, step=epoch)
 
@@ -184,25 +283,16 @@ def sample_and_plot(
     reco_back = pd.DataFrame(reco_back)
     samples_back = pd.DataFrame(samples_back)
     for var in target_variables:
-        fig, ax = plt.subplots(1, 1, figsize=(15, 10), tight_layout=True)
-        ax.hist(
+        fig, ax = dump_main_plot(
             reco_back[var],
-            bins=100,
-            histtype="step",
-            label="reco",
-            range=original_ranges[var],
-        )
-        ax.hist(
             samples_back[var],
-            bins=100,
-            histtype="step",
-            label="sampled",
-            range=original_ranges[var],
+            var,
+            100,
+            original_ranges[var],
+            ["reco", "sampled"], 
         )
-        ax.set_xlabel(var)
-        ax.legend()
         if device == 0 or type(device) != int:
-            fig_name = f"{var}_reco_sampled_back.png"
+            fig_name = f"{var}_reco_sampled.png"
             writer.add_figure(fig_name, fig, epoch)
             comet_logger.log_figure(fig_name, fig, step=epoch)
 
@@ -280,6 +370,10 @@ def train(device, cfg, world_size=None, device_ids=None):
         ddp_model = model
     # print(f"Memory allocated on device {device_id} after calling DDP: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
     print("Number of parameters: ", sum(p.numel() for p in model.parameters()))
+
+    early_stopping = EarlyStopping(
+        patience=cfg.stopper.patience, min_delta=cfg.stopper.min_delta
+    )
 
     # make datasets
     train_dataset = PhotonDataset(
@@ -409,7 +503,6 @@ def train(device, cfg, world_size=None, device_ids=None):
                 epoch=epoch,
                 writer=writer,
                 comet_logger=comet_logger,
-                save_dir=".",
                 context_variables=cfg.context_variables,
                 target_variables=cfg.target_variables,
                 device=device,
@@ -449,7 +542,12 @@ def train(device, cfg, world_size=None, device_ids=None):
                     is_ddp=world_size is not None,
                 )
 
+        early_stopping(epoch_train_loss)
+        if early_stopping.early_stop:
+            break
+
     writer.close()
+
 
 @hydra.main(version_base=None, config_path="config_photons", config_name="cfg0")
 def main(cfg):
