@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from scipy.stats import wasserstein_distance
 import matplotlib.pyplot as plt
 import pickle as pkl
+from comet_ml import Experiment
 
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
@@ -47,6 +48,34 @@ def readable_allocated_memory(memory_bytes):
         return f"{memory_kilobytes:.2f} KB"
     else:
         return f"{memory_bytes:.2f} B"
+
+
+def flatten_dict(d, parent_key='', sep='.'):
+   items = []
+   for k, v in d.items():
+       new_key = parent_key + sep + k if parent_key else k
+       if isinstance(v, dict):
+           items.extend(flatten_dict(v, new_key, sep=sep).items())
+       else:
+           items.append((new_key, v))
+   return dict(items)
+
+
+def setup_comet_logger(name, cfg):
+    comet_logger = Experiment(
+        api_key="DzzVXiirHMuZBc2iIketfZWbm",
+        workspace="maxgalli",
+        project_name="flashsimstudies",
+        #experiment_name="",
+        #save_dir="",
+    )
+    comet_logger.set_name(name)
+    # rearrange the dict such that if a key is a dict, it is flattened
+    cfg = OmegaConf.to_container(cfg, resolve=True)
+    cfg = flatten_dict(cfg)
+    for k, v in cfg.items():
+        comet_logger.log_parameter(k, v)
+    return comet_logger
 
 
 class PhotonDataset(Dataset):
@@ -86,6 +115,7 @@ def sample_and_plot(
     model,
     epoch,
     writer,
+    comet_logger,
     save_dir,
     context_variables,
     target_variables,
@@ -130,7 +160,9 @@ def sample_and_plot(
         ax.set_xlabel(var)
         ax.legend()
         if device == 0 or type(device) != int:
-            writer.add_figure(f"{var}_reco_sampled", fig, epoch)
+            fig_name = f"{var}_reco_sampled.png"
+            writer.add_figure(fig_name, fig, epoch)
+            comet_logger.log_figure(fig_name, fig, step=epoch)
 
     # plot after preprocessing back
     preprocess_dct = f"/work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/pipelines.pkl"
@@ -170,7 +202,9 @@ def sample_and_plot(
         ax.set_xlabel(var)
         ax.legend()
         if device == 0 or type(device) != int:
-            writer.add_figure(f"{var}_reco_sampled_back", fig, epoch)
+            fig_name = f"{var}_reco_sampled_back.png"
+            writer.add_figure(fig_name, fig, epoch)
+            comet_logger.log_figure(fig_name, fig, step=epoch)
 
 
 def ddp_setup(rank, world_size):
@@ -281,6 +315,11 @@ def train(device, cfg, world_size=None, device_ids=None):
 
     # train the model
     writer = SummaryWriter(log_dir="runs")
+
+    # setup comet logger
+    comet_name = os.getcwd().split("/")[-1]
+    comet_logger = setup_comet_logger(comet_name, cfg)
+
     optimizer = torch.optim.Adam(
         # optimizer = torch.optim.SGD(
         model.parameters(),
@@ -357,6 +396,9 @@ def train(device, cfg, world_size=None, device_ids=None):
             writer.add_scalars(
                 "Losses", {"train": epoch_train_loss, "val": epoch_test_loss}, epoch
             )
+            comet_logger.log_metrics(
+                {"train": epoch_train_loss, "val": epoch_test_loss}, step=epoch
+            )
 
         # sample and validation
         if epoch % cfg.sample_every == 0 or epoch == 1:
@@ -366,6 +408,7 @@ def train(device, cfg, world_size=None, device_ids=None):
                 model=model,
                 epoch=epoch,
                 writer=writer,
+                comet_logger=comet_logger,
                 save_dir=".",
                 context_variables=cfg.context_variables,
                 target_variables=cfg.target_variables,
