@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import pickle as pkl
 from comet_ml import Experiment
 import mplhep as hep
+import corner
 
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
@@ -295,6 +296,47 @@ def sample_and_plot(
             fig_name = f"{var}_reco_sampled.png"
             writer.add_figure(fig_name, fig, epoch)
             comet_logger.log_figure(fig_name, fig, step=epoch)
+
+    # corner plots with target variables
+    fig = corner.corner(
+        reco_back[target_variables],
+        labels=target_variables,
+        range=[original_ranges[var] for var in target_variables],
+        quantiles=[0.5, 0.9, 0.99],
+        color="g",
+        hist_bin_factor=3,
+        plot_datapoints=False,
+        scale_hist=True,
+        label_kwargs=dict(fontsize=10),
+    )
+    corner.corner(
+        samples_back[target_variables],
+        labels=target_variables,
+        range=[original_ranges[var] for var in target_variables],
+        quantiles=[0.5, 0.9, 0.99],
+        color="b",
+        hist_bin_factor=3,
+        plot_datapoints=False,
+        scale_hist=True,
+        label_kwargs=dict(fontsize=12),
+        fig=fig,
+    )
+    for ax in fig.get_axes():
+        ax.tick_params(axis="both", labelsize=12)
+    # add legend
+    fig.legend(
+        handles=[
+            plt.Line2D([0], [0], color="g", lw=2),
+            plt.Line2D([0], [0], color="b", lw=2),
+        ],
+        labels=["reco", "sampled"],
+        loc="upper right",
+        fontsize=28,
+    )
+    if device == 0 or type(device) != int:
+        fig_name = "corner_reco_sampled.png"
+        writer.add_figure(fig_name, fig, epoch)
+        comet_logger.log_figure(fig_name, fig, step=epoch)
 
 
 def ddp_setup(rank, world_size):
