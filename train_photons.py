@@ -47,7 +47,6 @@ def ddp_setup(rank, world_size):
 
 def train(device, cfg, world_size=None, device_ids=None):
     # device is device when not distributed and rank when distributed
-
     if world_size is not None:
         ddp_setup(device, world_size)
 
@@ -93,7 +92,6 @@ def train(device, cfg, world_size=None, device_ids=None):
     else:
         start_epoch = 1
         best_train_loss = 10000000
-    # print(f"Memory allocated on device {device_id} after creating model: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
 
     if world_size is not None:
         ddp_model = DDP(
@@ -105,7 +103,6 @@ def train(device, cfg, world_size=None, device_ids=None):
         model = ddp_model.module
     else:
         ddp_model = model
-    # print(f"Memory allocated on device {device_id} after calling DDP: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
     print("Number of parameters: ", sum(p.numel() for p in model.parameters()))
 
     early_stopping = EarlyStopping(
@@ -148,7 +145,6 @@ def train(device, cfg, world_size=None, device_ids=None):
         # num_workers=2,
         #pin_memory=True,
     )
-    # print(f"Memory allocated on device {device_id} after creating datasets: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
 
     # train the model
     writer = SummaryWriter(log_dir="runs")
@@ -182,35 +178,18 @@ def train(device, cfg, world_size=None, device_ids=None):
         print("Training...")
         for i, (context, target) in enumerate(train_loader):
             context, target = context.to(device), target.to(device)
-            # context, target = context.to(dtype=torch.float16).to(device), target.to(dtype=torch.float16).to(device)
-            # print(target.shape)
-            # print(f"Memory on device {device_id} after moving data of batch {i}: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
             model.train()
             optimizer.zero_grad()
-            # for param in ddp_model.module.parameters():
-            #    param.grad = None
-
-            # with profile(
-            #    activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-            #    record_shapes=True,
-            # ) as prof:
-            #    with record_function("forward pass"):
             log_prog, logabsdet = ddp_model(target, context=context)
-            # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=100))
-            # print(f"Memory on device {device_id} after forward pass of batch {i}: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
             loss = -log_prog - logabsdet
             loss = loss.mean()
             train_losses.append(loss.item())
 
             loss.backward()
-            # print(f"Memory on device {device_id} after backward pass of batch {i}: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
             optimizer.step()
             scheduler.step()
-            # print(f"Memory on device {device_id} after optimizer step of batch {i}: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
 
         epoch_train_loss = np.mean(train_losses)
-        # if world_size is not None:
-        #    epoch_train_loss *= world_size
         train_history.append(epoch_train_loss)
 
         # test
@@ -223,11 +202,8 @@ def train(device, cfg, world_size=None, device_ids=None):
                 loss = -log_prog - logabsdet
                 loss = loss.mean()
                 test_losses.append(loss.item())
-        # print(f"Memory allocated on device {device_id} after testing: {readable_allocated_memory(torch.cuda.memory_allocated(device))}")
 
         epoch_test_loss = np.mean(test_losses)
-        # if world_size is not None:
-        #    epoch_test_loss *= world_size
         test_history.append(epoch_test_loss)
         if device == 0 or world_size is None:
             writer.add_scalars(
