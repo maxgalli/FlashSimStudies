@@ -3,17 +3,14 @@ import cloudpickle
 import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import PowerTransformer
-from sklearn.preprocessing import QuantileTransformer
+from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, PowerTransformer, QuantileTransformer, StandardScaler
 import dask.dataframe as dd
 import dask
 import distributed
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
-from utils.transforms import original_ranges, Smearer, Displacer
+from utils.transforms import original_ranges, Smearer, Displacer, IsoTransformerBC, IsoTransformerLNorm
 
 
 pipelines = {
@@ -201,6 +198,137 @@ pipelines = {
                 ("displacer_2", Displacer(mask_lower_bound=1, where_to_displace=0.5)),
             ]
         ),
+    },
+    "pipe1": {
+        "GenPho_pt": Pipeline([("box-cox", PowerTransformer(method="box-cox"))]),
+        "GenPho_eta": Pipeline([("standard", StandardScaler())]),
+        "GenPho_phi": Pipeline([("standard", StandardScaler())]),
+        "GenPho_status": Pipeline(
+            [
+                ("smearer", Smearer("uniform")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "GenPhoGenEle_deltar": Pipeline([("standard", StandardScaler())]),
+        "ClosestGenJet_pt": Pipeline([("box-cox", PowerTransformer(method="box-cox"))]),
+        "ClosestGenJet_mass": Pipeline([("standard", StandardScaler())]),
+        "PU_gpudensity": Pipeline([("none", None)]),
+        "PU_nPU": Pipeline([("standard", StandardScaler())]),
+        "PU_nTrueInt": Pipeline([("standard", StandardScaler())]),
+        "PU_pudensity": Pipeline(
+            [
+                ("smearer", Smearer("uniform")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "PU_sumEOOT": Pipeline([("standard", StandardScaler())]),
+        "PU_sumLOOT": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_r9": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log(x + 1e-2), inverse_func=lambda x: np.exp(x) - 1e-2
+                    ),
+                ),
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x * 10 - 0.15),
+                        inverse_func=lambda x: (np.tan(x) + 0.15) / 10,
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_sieie": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log(x * 10 + 1e-1),
+                        inverse_func=lambda x: (np.exp(x) - 1e-1) / 10,
+                    ),
+                ),
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x - 1.25),
+                        inverse_func=lambda x: (np.tan(x) + 1.25),
+                    ),
+                ),
+                ("scaler", MinMaxScaler((-1, 1))),
+            ]
+        ),
+        "RecoPho_energyErr": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPhoGenPho_ptratio": Pipeline(
+            [
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x * 10 - 10),
+                        inverse_func=lambda x: (np.tan(x) + 10) / 10,
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPhoGenPho_deltaeta": Pipeline(
+            [
+                ("move-right", FunctionTransformer(lambda x: x + 1e-3, inverse_func=lambda x: x - 1e-3)),
+                ("box-cox", PowerTransformer(method="box-cox")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_s4": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_sieip": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_x_calo": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_hoe": Pipeline(
+            [
+                ("iso_transform", IsoTransformerBC(loc=-1, scale=0.5)),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_mvaID": Pipeline([("none", None)]),
+        "RecoPho_eCorr": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_pfRelIso03_all": Pipeline(
+            [
+                ("iso_transform", IsoTransformerBC(loc=-1, scale=0.5)),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_pfRelIso03_chg": Pipeline(
+            [
+                ("iso_transform", IsoTransformerBC(loc=-1, scale=0.5)),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_esEffSigmaRR": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        )
     }
 }
 
@@ -233,20 +361,22 @@ def main():
 
     # preprocess
     print("Preprocessing")
-    for pipe in pipelines.keys():
-        print(pipe)
-        for v in pipelines[pipe].keys():
+    for pipe_name in pipelines:
+        print(pipe_name)
+        dct = pipelines[pipe_name]
+        for v, pipe in dct.items():
+            print(v)
             # plot untransformed and transformed side by side
             fig, ax = plt.subplots(1, 2, figsize=(10, 5))
             ax[0].hist(df[v], bins=100, range=original_ranges[v])
-            trans_arr = pipelines[pipe][v].fit_transform(df[v].values.reshape(-1, 1))
+            trans_arr = pipe.fit_transform(df[v].values.reshape(-1, 1))
             ax[1].hist(trans_arr, bins=100)
             ax[0].set_xlabel(v)
             ax[1].set_xlabel(v)
             ax[0].set_title("Original")
             ax[1].set_title("Transformed")
             for format in ["png", "pdf"]:
-                fig.savefig(os.path.join(fig_output, pipe + "_" + v + "." + format))
+                fig.savefig(os.path.join(fig_output, pipe_name + "_" + v + "." + format))
 
     # split into train, test, val in 80, 20
     train, test = train_test_split(df, test_size=0.2)

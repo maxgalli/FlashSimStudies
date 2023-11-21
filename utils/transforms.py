@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import PowerTransformer
 
 
 original_ranges = {
@@ -166,3 +167,72 @@ class Displacer(TransformerMixin, BaseEstimator, MaskMixin):
         return np.where(
             self.mask, X + self.minimum - self.where_to_displace, X
         )
+
+        
+class IsoTransformerBC(TransformerMixin, BaseEstimator):
+    """
+    Transform the isolation variables with a box-cox transformation for values > 0 and a normal distribution for values <= 0.
+    """
+    def __init__(self, loc=0., scale=0.1):
+        self.loc = loc
+        self.scale = scale
+    
+    def fit(self, X, y=None):
+        non_zero_indices = np.where(X > 0)[0]
+        x_non_zero = X[non_zero_indices]
+        self.bc = PowerTransformer(method="box-cox").fit(x_non_zero.reshape(-1, 1))
+        x_non_zero_bc = self.bc.transform(x_non_zero.reshape(-1, 1))
+        self.min_bc = np.min(x_non_zero_bc)
+        return self
+    
+    def transform(self, X, y=None):
+        X = X.copy()
+        zero_indices = np.where(X <= 0)[0]
+        nonzero_indices = np.where(X > 0)[0]
+        # replace 0s with values sampled from gaussian
+        X[zero_indices] = np.random.normal(loc=self.loc, scale=self.scale, size=len(zero_indices)).reshape(-1, 1)
+        # shift the rest wiht boxcox
+        X[nonzero_indices] = self.bc.transform(X[nonzero_indices])
+        # now set the max of lognormal to 0 and the min of boxcox to 0
+        X[zero_indices] -= np.max(X[zero_indices])
+        X[nonzero_indices] -= self.min_bc
+        return X
+        
+    def inverse_transform(self, X, y=None):
+        X = X.copy()
+        zero_indices = np.where(X <= 0)[0]
+        nonzero_indices = np.where(X > 0)[0]
+        # transform back the boxcox
+        X[nonzero_indices] += self.min_bc
+        X[nonzero_indices] = self.bc.inverse_transform(X[nonzero_indices])
+        # replace values less than 0 with 0
+        X[zero_indices] = 0.
+        return X
+
+        
+class IsoTransformerLNorm(TransformerMixin, BaseEstimator):
+    def __init__(self):
+        pass
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X, y=None):
+        X = X.copy()
+        zero_indices = np.where(X <= 0)[0]
+        nonzero_indices = np.where(X > 0)[0]
+        # replace 0s with values sampled from triangular distribution
+        X[zero_indices] = -np.random.lognormal(mean=0.0001, sigma=0.1, size=len(zero_indices)).reshape(-1, 1)
+        # shift the rest
+        X[nonzero_indices] = np.log1p(X[nonzero_indices])
+        return X
+        
+    def inverse_transform(self, X, y=None):
+        X = X.copy()
+        zero_indices = np.where(X <= 0)[0]
+        nonzero_indices = np.where(X > 0)[0]
+        # expm1 the rest
+        X[nonzero_indices] = np.expm1(X[nonzero_indices])
+        # replace values less than 0 with 0
+        X[zero_indices] = 0.
+        return X
