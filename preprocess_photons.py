@@ -239,10 +239,12 @@ def main():
             # plot untransformed and transformed side by side
             fig, ax = plt.subplots(1, 2, figsize=(10, 5))
             ax[0].hist(df[v], bins=100, range=original_ranges[v])
-            df[v] = pipelines[pipe][v].fit_transform(df[v].values.reshape(-1, 1))
-            ax[1].hist(df[v], bins=100)
+            trans_arr = pipelines[pipe][v].fit_transform(df[v].values.reshape(-1, 1))
+            ax[1].hist(trans_arr, bins=100)
             ax[0].set_xlabel(v)
             ax[1].set_xlabel(v)
+            ax[0].set_title("Original")
+            ax[1].set_title("Transformed")
             for format in ["png", "pdf"]:
                 fig.savefig(os.path.join(fig_output, pipe + "_" + v + "." + format))
 

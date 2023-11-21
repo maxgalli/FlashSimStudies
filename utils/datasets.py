@@ -9,6 +9,7 @@ class PhotonDataset(Dataset):
         parquet_file,
         context_variables,
         target_variables,
+        pipelines,
         device=None,
         rows=None,
     ):
@@ -19,6 +20,10 @@ class PhotonDataset(Dataset):
         data = pd.read_parquet(
             parquet_file, columns=self.all_variables, engine="fastparquet"
         )
+        self.pipelines = pipelines
+        for var, pipeline in self.pipelines.items():
+            if var in self.all_variables:
+                data[var] = pipeline.transform(data[var].values.reshape(-1, 1)).reshape(-1)
         if rows is not None:
             data = data.iloc[:rows]
         self.target = data[target_variables].values

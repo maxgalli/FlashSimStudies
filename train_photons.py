@@ -113,10 +113,15 @@ def train(device, cfg, world_size=None, device_ids=None):
     )
 
     # make datasets
+    with open("/work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/pipelines.pkl", "rb") as f:
+        pipelines = pkl.load(f)
+        pipelines = pipelines[cfg.pipe]
+
     train_dataset = PhotonDataset(
         cfg.train.path,
         cfg.context_variables,
         cfg.target_variables,
+        pipelines,
         device=device,
         rows=cfg.train.size,
     )
@@ -132,6 +137,7 @@ def train(device, cfg, world_size=None, device_ids=None):
         cfg.test.path,
         cfg.context_variables,
         cfg.target_variables,
+        pipelines,
         device=device,
         rows=cfg.test.size,
     )

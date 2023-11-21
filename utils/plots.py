@@ -99,7 +99,6 @@ def sample_and_plot(
     target_variables,
     device,
 ):
-    context_size = len(context_variables)
     target_size = len(target_variables)
     with torch.no_grad():
         gen, reco, samples = [], [], []
@@ -139,10 +138,7 @@ def sample_and_plot(
             comet_logger.log_figure(fig_name, fig, step=epoch)
 
     # plot after preprocessing back
-    preprocess_dct = f"/work/gallim/SIMStudies/FlashSimStudies/preprocessing/preprocessed_photons/pipelines.pkl"
-    with open(preprocess_dct, "rb") as f:
-        preprocess_dct = pkl.load(f)
-    preprocess_dct = preprocess_dct["pipe0"]
+    preprocess_dct = test_loader.dataset.pipelines
     reco_back = {}
     samples_back = {}
     for var in target_variables:

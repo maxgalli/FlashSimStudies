@@ -84,6 +84,11 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
         return numbers[closest_indices]
 
     def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X = X.copy()
+
         self.occurrences = self.count_occurrences(X)
         self.values = np.array(list(self.occurrences.keys()))
         self.half_distances = self.get_half_distances(
@@ -96,9 +101,6 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
             ]
         )
 
-        return self
-
-    def transform(self, X, y=None):
         self.mask = self.apply_mask(X).reshape(X.shape)
         
         new_sub_arrs = []
@@ -127,6 +129,7 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
         return X_transformed
 
     def inverse_transform(self, X, y=None):
+        X = X.copy()
         self.mask = self.apply_mask(X).reshape(X.shape)
         return np.where(
             self.mask,
@@ -149,6 +152,7 @@ class Displacer(TransformerMixin, BaseEstimator, MaskMixin):
         return self
 
     def transform(self, X, y=None):
+        X = X.copy()
         self.mask = self.apply_mask(X).reshape(X.shape)
         self.minimum = np.min(X[self.mask])
         X_transformed = np.where(
@@ -157,6 +161,7 @@ class Displacer(TransformerMixin, BaseEstimator, MaskMixin):
         return X_transformed
 
     def inverse_transform(self, X, y=None):
+        X = X.copy()
         self.mask = self.apply_mask(X).reshape(X.shape)
         return np.where(
             self.mask, X + self.minimum - self.where_to_displace, X
