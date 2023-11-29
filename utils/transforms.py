@@ -71,6 +71,9 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
         return result
 
     def count_occurrences(self, arr):
+        """ Count occurrences of each unique value in arr
+        Returns a dictionary with keys=unique values and values=counts
+        """
         unique_values = np.unique(arr).astype("int64")
         counts = np.bincount(arr.astype("int64")[:, 0])
         dct = dict(zip(unique_values, counts[unique_values]))
@@ -79,6 +82,9 @@ class Smearer(TransformerMixin, BaseEstimator, MaskMixin):
         return dct
 
     def find_closest_numbers(self, sample, numbers):
+        """ Given a sample and a list of numbers, find the closest number in the list for each element of the sample
+        Returns an array of the same shape as sample
+        """
         closest_indices = np.argmin(
             np.abs(sample[:, 0] - numbers[:, np.newaxis]), axis=0
         )

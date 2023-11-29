@@ -11,6 +11,90 @@ from .transforms import original_ranges
 hep.style.use("CMS")
 
 
+def divide_dist(distribution, bins):
+    sorted_dist = np.sort(distribution)
+    subgroup_size = len(distribution) // bins
+    edges = [sorted_dist[0]]
+    for i in range(subgroup_size, len(sorted_dist), subgroup_size):
+        edges.append(sorted_dist[i])
+    edges[-1] = sorted_dist[-1]
+    return edges
+
+
+def interpolate_weighted_quantiles(values, weights, quantiles):
+    i = np.argsort(values)
+    c = np.cumsum(weights[i])
+    return values[i[np.searchsorted(c, np.array(quantiles) * c[-1])]]
+
+
+def dump_profile_plot(
+    ax, ss_name, cond_name, sample_name, ss_arr, cond_arr, color, cond_edges, weights
+):
+    df = pd.DataFrame({ss_name: ss_arr, cond_name: cond_arr, "weights": weights})
+    quantiles = [0.25, 0.5, 0.75]
+    qlists = [[], [], []]
+    centers = []
+    for left_edge, right_edge in zip(cond_edges[:-1], cond_edges[1:]):
+        dff = df[(df[cond_name] > left_edge) & (df[cond_name] < right_edge)]
+        # procedure for weighted quantiles
+        data = dff[ss_name].values
+        weights = dff["weights"].values
+        qlist = interpolate_weighted_quantiles(data, weights, quantiles)
+        for i, q in enumerate(qlist):
+            qlists[i].append(q)
+        centers.append((left_edge + right_edge) / 2)
+    mid_index = len(quantiles) // 2
+    for qlist in qlists[:mid_index]:
+        ax.plot(centers, qlist, color=color, linestyle="dashed")
+    for qlist in qlists[mid_index:]:
+        ax.plot(centers, qlist, color=color, linestyle="dashed")
+    ax.plot(centers, qlists[mid_index], color=color, label=sample_name)
+
+    return ax
+
+
+def dump_full_profile_plot(
+    nbins,
+    target_variable,
+    cond_variable,
+    reco_df,
+    sample_df,
+):
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    reco_arr = reco_df[target_variable].values
+    reco_cond_arr = reco_df[cond_variable].values
+    sample_arr = sample_df[target_variable].values
+    sample_cond_arr = sample_df[cond_variable].values
+    cond_edges = divide_dist(reco_cond_arr, nbins)
+
+    for name, ss_arr, cond_arr, color, w in [
+        ("reco", reco_arr, reco_cond_arr, "blue", np.ones(len(reco_arr))),
+        ("sampled", sample_arr, sample_cond_arr, "green", np.ones(len(sample_arr))),
+    ]:
+        ax = dump_profile_plot(
+            ax=ax,
+            ss_name=target_variable,
+            cond_name=cond_variable,
+            sample_name=name,
+            ss_arr=ss_arr,
+            cond_arr=cond_arr,
+            color=color,
+            cond_edges=cond_edges,
+            weights=w,
+        )
+    ax.legend()
+    ax.set_xlabel(cond_variable)
+    ax.set_ylabel(target_variable)
+    # reduce dimension of labels and axes names
+    plt.rcParams["axes.labelsize"] = 12
+    plt.rcParams["xtick.labelsize"] = 12
+    plt.rcParams["ytick.labelsize"] = 12
+    plt.rcParams["legend.fontsize"] = 12
+    fig.tight_layout()
+
+    return fig, ax
+
+
 def dump_main_plot(
     arr1,
     arr2,
@@ -56,18 +140,24 @@ def dump_main_plot(
         linestyle="",
     )
 
-    ratio_hist = arr1_hist_norm / arr2_hist_norm
-    ratio_err = np.sqrt((arr1_err_norm / arr1_hist_norm) ** 2 + (arr2_err_norm / arr2_hist_norm) ** 2) * ratio_hist
-    down.errorbar(
-        centers,
-        ratio_hist,
-        yerr=ratio_err,
-        color="k",
-        marker="o",
-        linestyle="",
-    )    
+    try: 
+        ratio_hist = arr1_hist_norm / arr2_hist_norm
+        ratio_err = np.sqrt((arr1_err_norm / arr1_hist_norm) ** 2 + (arr2_err_norm / arr2_hist_norm) ** 2) * ratio_hist
+        down.errorbar(
+            centers,
+            ratio_hist,
+            yerr=ratio_err,
+            color="k",
+            marker="o",
+            linestyle="",
+        )    
+    except ZeroDivisionError:
+        print("ZeroDivisionError")
+        pass
 
     # cosmetics
+    if var_name in ["RecoPhoGenPho_deltaeta", "RecoPho_sieip", "RecoPho_pfRelIso03_chg", "RecoPho_pfRelIso03_all", "RecoPho_hoe", "RecoPho_esEffSigmaRR"]:
+        up.set_yscale("log")
     up.set_ylabel("Normalized yield")
     down.set_ylabel("Ratio")
     down.set_xlabel(var_name)
@@ -133,7 +223,7 @@ def sample_and_plot(
             ["reco", "sampled"], 
         )
         if device == 0 or type(device) != int:
-            fig_name = f"{var}_reco_sampled_transformed.png"
+            fig_name = f"{var}_reco_sampled_transformed"
             writer.add_figure(fig_name, fig, epoch)
             comet_logger.log_figure(fig_name, fig, step=epoch)
 
@@ -164,9 +254,36 @@ def sample_and_plot(
             ["reco", "sampled"], 
         )
         if device == 0 or type(device) != int:
-            fig_name = f"{var}_reco_sampled.png"
+            fig_name = f"{var}_reco_sampled"
             writer.add_figure(fig_name, fig, epoch)
             comet_logger.log_figure(fig_name, fig, step=epoch)
+
+    # profile plots
+    # attach context variables to the reco and sampled dataframes
+    for var in context_variables:
+        var_back = (
+            preprocess_dct[var]
+            .inverse_transform(gen[var].values.reshape(-1, 1))
+            .reshape(-1)
+        )
+        reco_back[var] = var_back
+        samples_back[var] = var_back
+    for var in target_variables:
+        nbins_profile = 8
+        for cond_var in context_variables:
+            if cond_var not in ["GenPho_status", "PU_pudensity"]:
+                print(f"Plotting {var} vs {cond_var}")
+                fig, ax = dump_full_profile_plot(
+                    nbins_profile,
+                    var,
+                    cond_var,
+                    reco_back,
+                    samples_back,
+                )
+                if device == 0 or type(device) != int:
+                    fig_name = f"profile_{var}_vs_{cond_var}"
+                    writer.add_figure(fig_name, fig, epoch)
+                    comet_logger.log_figure(fig_name, fig, step=epoch)
 
     # corner plots with target variables
     fig = corner.corner(
@@ -205,6 +322,6 @@ def sample_and_plot(
         fontsize=28,
     )
     if device == 0 or type(device) != int:
-        fig_name = "corner_reco_sampled.png"
+        fig_name = "corner_reco_sampled"
         writer.add_figure(fig_name, fig, epoch)
         comet_logger.log_figure(fig_name, fig, step=epoch)
