@@ -213,7 +213,9 @@ def sample_and_plot(
     # plot the reco and sampled distributions
     for var in target_variables:
         mn = min(reco[var].min(), samples[var].min())
+        mn = mn if mn > -10 else -5
         mx = max(reco[var].max(), samples[var].max())
+        mx = mx if mx < 10 else 5
         fig, ax = dump_main_plot(
             reco[var],
             samples[var],

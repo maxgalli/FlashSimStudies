@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 from utils.transforms import original_ranges, Smearer, Displacer, IsoTransformerBC, IsoTransformerLNorm
+from utils.plots import dump_main_plot
 
 
 pipelines = {
@@ -257,7 +258,7 @@ pipelines = {
                         inverse_func=lambda x: (np.tan(x) + 1.25),
                     ),
                 ),
-                ("scaler", MinMaxScaler((-1, 1))),
+                ("scaler", StandardScaler()),
             ]
         ),
         "RecoPho_energyErr": Pipeline(
@@ -329,7 +330,260 @@ pipelines = {
                 ("standard", StandardScaler()),
             ]
         )
-    }
+    },
+    "pipe1_bis": {
+        "GenPho_pt": Pipeline([("box-cox", PowerTransformer(method="box-cox"))]),
+        "GenPho_eta": Pipeline([("standard", StandardScaler())]),
+        "GenPho_phi": Pipeline([("standard", StandardScaler())]),
+        "GenPho_status": Pipeline(
+            [
+                ("smearer", Smearer("uniform")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "GenPhoGenEle_deltar": Pipeline([("standard", StandardScaler())]),
+        "ClosestGenJet_pt": Pipeline([("box-cox", PowerTransformer(method="box-cox"))]),
+        "ClosestGenJet_mass": Pipeline([("standard", StandardScaler())]),
+        "PU_gpudensity": Pipeline([("none", None)]),
+        "PU_nPU": Pipeline([("standard", StandardScaler())]),
+        "PU_nTrueInt": Pipeline([("standard", StandardScaler())]),
+        "PU_pudensity": Pipeline(
+            [
+                ("smearer", Smearer("uniform")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "PU_sumEOOT": Pipeline([("standard", StandardScaler())]),
+        "PU_sumLOOT": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_r9": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log(x + 1e-2), inverse_func=lambda x: np.exp(x) - 1e-2
+                    ),
+                ),
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x * 10 - 0.15),
+                        inverse_func=lambda x: (np.tan(x) + 0.15) / 10,
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_sieie": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log(x * 10 + 1e-1),
+                        inverse_func=lambda x: (np.exp(x) - 1e-1) / 10,
+                    ),
+                ),
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x - 1.25),
+                        inverse_func=lambda x: (np.tan(x) + 1.25),
+                    ),
+                ),
+                ("scaler", StandardScaler()),
+            ]
+        ),
+        "RecoPho_energyErr": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPhoGenPho_ptratio": Pipeline(
+            [
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x * 10 - 10),
+                        inverse_func=lambda x: (np.tan(x) + 10) / 10,
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPhoGenPho_deltaeta": Pipeline(
+            [
+                ("move-right", FunctionTransformer(lambda x: x + 1e-3, inverse_func=lambda x: x - 1e-3)),
+                ("box-cox", PowerTransformer(method="box-cox")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_s4": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_sieip": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_x_calo": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_hoe": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_mvaID": Pipeline([("none", None)]),
+        "RecoPho_eCorr": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_pfRelIso03_all": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_pfRelIso03_chg": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_esEffSigmaRR": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        )
+    },
+    "pipe1_nocontext": {
+        "GenPho_pt": Pipeline([("none", None)]),
+        "GenPho_eta": Pipeline([("none", None)]),
+        "GenPho_phi": Pipeline([("none", None)]),
+        "GenPho_status": Pipeline([("none", None)]),
+        "GenPhoGenEle_deltar": Pipeline([("none", None)]),
+        "ClosestGenJet_pt": Pipeline([("none", None)]),
+        "ClosestGenJet_mass": Pipeline([("none", None)]),
+        "PU_gpudensity": Pipeline([("none", None)]),
+        "PU_nPU": Pipeline([("none", None)]),
+        "PU_nTrueInt": Pipeline([("none", None)]),
+        "PU_pudensity": Pipeline([("none", None)]),
+        "PU_sumEOOT": Pipeline([("none", None)]),
+        "PU_sumLOOT": Pipeline([("none", None)]),
+        "RecoPho_r9": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log(x + 1e-2), inverse_func=lambda x: np.exp(x) - 1e-2
+                    ),
+                ),
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x * 10 - 0.15),
+                        inverse_func=lambda x: (np.tan(x) + 0.15) / 10,
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_sieie": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log(x * 10 + 1e-1),
+                        inverse_func=lambda x: (np.exp(x) - 1e-1) / 10,
+                    ),
+                ),
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x - 1.25),
+                        inverse_func=lambda x: (np.tan(x) + 1.25),
+                    ),
+                ),
+                ("scaler", StandardScaler()),
+            ]
+        ),
+        "RecoPho_energyErr": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPhoGenPho_ptratio": Pipeline(
+            [
+                (
+                    "arctan_trans",
+                    FunctionTransformer(
+                        lambda x: np.arctan(x * 10 - 10),
+                        inverse_func=lambda x: (np.tan(x) + 10) / 10,
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPhoGenPho_deltaeta": Pipeline(
+            [
+                ("move-right", FunctionTransformer(lambda x: x + 1e-3, inverse_func=lambda x: x - 1e-3)),
+                ("box-cox", PowerTransformer(method="box-cox")),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_s4": Pipeline(
+            [
+                (
+                    "log_trans",
+                    FunctionTransformer(
+                        lambda x: np.log1p(x), inverse_func=lambda x: np.expm1(x)
+                    ),
+                ),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_sieip": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_x_calo": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_hoe": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_mvaID": Pipeline([("none", None)]),
+        "RecoPho_eCorr": Pipeline([("standard", StandardScaler())]),
+        "RecoPho_pfRelIso03_all": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_pfRelIso03_chg": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        ),
+        "RecoPho_esEffSigmaRR": Pipeline(
+            [
+                ("iso_transform", IsoTransformerLNorm()),
+                ("standard", StandardScaler()),
+            ]
+        )
+    },
+
 }
 
 
@@ -359,6 +613,10 @@ def main():
             break
         df = pd.concat([df, part.compute()[all_variables]])
 
+    # split into train, test, val in 80, 20
+    train, test = train_test_split(df, test_size=0.2)
+    print(len(train), len(test))
+
     # preprocess
     print("Preprocessing")
     for pipe_name in pipelines:
@@ -367,20 +625,50 @@ def main():
         for v, pipe in dct.items():
             print(v)
             # plot untransformed and transformed side by side
-            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-            ax[0].hist(df[v], bins=100, range=original_ranges[v])
-            trans_arr = pipe.fit_transform(df[v].values.reshape(-1, 1))
-            ax[1].hist(trans_arr, bins=100)
-            ax[0].set_xlabel(v)
-            ax[1].set_xlabel(v)
-            ax[0].set_title("Original")
-            ax[1].set_title("Transformed")
-            for format in ["png", "pdf"]:
+            arr = train[v].values
+            arr_trans = pipe.fit_transform(arr.reshape(-1, 1))
+            arr_trans_back = pipe.inverse_transform(arr_trans.reshape(-1, 1))
+            fig, (ax1, ax2) = dump_main_plot(
+                arr,
+                arr_trans_back,
+                v,
+                100,
+                original_ranges[v],
+                labels=["Original", "Transformed Back"],    
+            )
+            for format in ["png"]:
                 fig.savefig(os.path.join(fig_output, pipe_name + "_" + v + "." + format))
+            
+            # plot arr and arr_trans side by side
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 8))
+            ax1.hist(arr, bins=100, histtype="step", range=original_ranges[v], density=True)
+            ax1.set_title("Original")
+            ax2.hist(arr_trans, bins=100, histtype="step", range=(np.min(arr_trans), np.max(arr_trans)), density=True)
+            ax2.set_title("Transformed")
+            ax1.set_xlabel(v)
+            ax2.set_xlabel(v)
+            ax1.set_ylabel("Normalized yield")
+            for format in ["png"]:
+                fig.savefig(os.path.join(fig_output, pipe_name + "_" + v + "_both." + format))
 
-    # split into train, test, val in 80, 20
-    train, test = train_test_split(df, test_size=0.2)
-    print(len(train), len(test))
+    # plot also for test
+    print("plotting also for test dataset")
+    for pipe_name in pipelines:
+        dct = pipelines[pipe_name]
+        for v, pipe in dct.items():
+            arr = test[v].values
+            arr_trans = pipe.transform(arr.reshape(-1, 1))
+            arr_trans_back = pipe.inverse_transform(arr_trans.reshape(-1, 1))
+            fig, (ax1, ax2) = dump_main_plot(
+                arr,
+                arr_trans_back,
+                v,
+                100,
+                original_ranges[v],
+                labels=["Original", "Transformed Back"],
+            )
+            for format in ["png"]:
+                fig.savefig(os.path.join(fig_output, "test_" + pipe_name + "_" + v + "." + format))
 
     # dump to parquet
     for name, df in zip(["train", "test"], [train, test]):
