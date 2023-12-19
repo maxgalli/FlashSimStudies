@@ -2,7 +2,7 @@
 
 # Define the parameters
 params=(
-  "cfg11"
+  "CfgFile"
 )
 
 # Loop over the parameters

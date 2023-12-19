@@ -85,7 +85,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train_photons.py --config-name cfg7
 
 ## Quick Start (for Photons)
 
-1. Create the environment following [these instructions](#setup). Note that some packages (such as tensorboard) might be missing - if this is the case, just install it by hand. The repo containg the models is needed, more specifically the branch ```electrons_new``` of ```wipfs``` ([link](https://github.com/francesco-vaselli/wipfs/tree/electrons_new)). The structure should be something that looks like this:
+1. Create the environment following [these instructions](#setup). Note that some packages (such as tensorboard) might be missing - if this is the case, just install it by hand. The repo containg the models is needed, more specifically [trainer](https://github.com/cms-flashsim/trainer). The structure should be something that looks like this:
 ```
 .
 ├── FlashSimStudies
@@ -94,6 +94,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train_photons.py --config-name cfg7
 │   └── training
 ├── packages_to_install
 │   └── nflows
+├── trainer
 └── wipfs
 ``` 
 
@@ -110,9 +111,9 @@ python extract_photons.py --executor dask
 python preprocess_photons.py
 ```
 
-5. Training: hydra is used for configuration and commands are reported [above](#training). **Note**: the models used are the ones already included in ```wipfs```, hence the path to this directory is appended to the Python path. Again, grep for ```gallim``` and change it accordingly.
+5. Training: hydra is used for configuration and commands are reported [above](#training). **Note**: the models used are the ones already included in ```trainer```, hence the path to this directory is appended to the Python path. Again, grep for ```gallim``` and change it accordingly.
 
-To check the results we use tensorboard:
+To check the results we use comet (for this **the token has to be changed**) or tensorboard:
 ```
 tensorboard --logdir=outputs --port 6006
 ```

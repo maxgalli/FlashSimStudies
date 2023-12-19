@@ -20,8 +20,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group
 
 
-# where wipfs modules are
-sys.path.append("/work/gallim/SIMStudies/wipfs/models")
+# where central FlashSim modules are
+sys.path.append("/work/gallim/SIMStudies/trainer/trainer/utils")
 sys.path.append("/work/gallim/SIMStudies/FlashSimStudies/preprocessing")
 
 # seed
@@ -61,6 +61,7 @@ def train(device, cfg, world_size=None, device_ids=None):
         "base_kwargs": {
             "num_steps_maf": cfg.model.maf.num_steps,
             "num_steps_arqs": cfg.model.arqs.num_steps,
+            "num_steps_caf": cfg.model.caf.num_steps,
             "num_transform_blocks_maf": cfg.model.maf.num_transform_blocks,
             "num_transform_blocks_arqs": cfg.model.arqs.num_transform_blocks,
             "activation": cfg.model.activation,
@@ -74,9 +75,11 @@ def train(device, cfg, world_size=None, device_ids=None):
             "tail_bound_arqs": cfg.model.arqs.tail_bound,
             "hidden_dim_maf": cfg.model.maf.hidden_dim,
             "hidden_dim_arqs": cfg.model.arqs.hidden_dim,
+            "hidden_dim_caf": cfg.model.caf.hidden_dim,
             "init_identity": cfg.model.init_identity,
+            "permute_type": cfg.model.permute_type,
+            "affine_type": cfg.model.maf.affine_type,
         },
-        "transform_type": cfg.model.transform_type,
     }
     model = create_mixture_flow_model(**flow_params_dct).to(device)
     if cfg.checkpoint is not None:
@@ -242,7 +245,6 @@ def train(device, cfg, world_size=None, device_ids=None):
                 name="checkpoint-latest.pt",
                 model_dir=".",
                 optimizer=optimizer,
-                is_ddp=world_size is not None,
             )
         
         if epoch_train_loss < best_train_loss:
@@ -258,7 +260,6 @@ def train(device, cfg, world_size=None, device_ids=None):
                     name="best_train_loss.pt",
                     model_dir=".",
                     optimizer=optimizer,
-                    is_ddp=world_size is not None,
                 )
 
         early_stopping(epoch_train_loss)

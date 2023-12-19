@@ -1,8 +1,8 @@
 #! /bin/bash
 
 #SBATCH -J train-photons-{param1}
-#SBATCH --output=/work/gallim/SIMStudies/FlashSimStudies/training/jobs/train_photons-{param1}.out
-#SBATCH --error=/work/gallim/SIMStudies/FlashSimStudies/training/jobs/train_photons-{param1}.err
+#SBATCH --output=/work/gallim/SIMStudies/FlashSimStudies/jobs/train_photons-{param1}.out
+#SBATCH --error=/work/gallim/SIMStudies/FlashSimStudies/jobs/train_photons-{param1}.err
 
 #SBATCH --account=gpu_gres               # to access gpu resources
 #SBATCH --partition=gpu
@@ -13,4 +13,4 @@
 #SBATCH --time=1-40:00:00
 #SBATCH --gres-flags=disable-binding
 
-cd /work/gallim/SIMStudies/FlashSimStudies/training; /work/gallim/mambaforge/envs/FlashSimStudies/bin/python train_photons.py --config-name {param1}
+cd /work/gallim/SIMStudies/FlashSimStudies; /work/gallim/mambaforge/envs/FlashSimStudies/bin/python train_photons.py --config-name {param1}
