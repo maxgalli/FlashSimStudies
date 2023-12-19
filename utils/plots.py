@@ -5,10 +5,27 @@ import corner
 import torch
 import mplhep as hep
 import pickle as pkl
+import os
 
 from .transforms import original_ranges
 
 hep.style.use("CMS")
+
+
+def custom_save_png_to_comet(
+    comet_logger,
+    plt_fig,
+    fig_name,
+    step,
+):
+    # create local .assets folder if it doesn't exist
+    if not os.path.exists(".assets"):
+        os.makedirs(".assets")
+    # save the figure locally
+    full_name = ".assets/test.png" 
+    plt_fig.savefig(full_name)
+    # upload the figure to comet
+    comet_logger.log_image(full_name, name=fig_name, step=step, image_format="png")
 
 
 def divide_dist(distribution, bins):
@@ -225,9 +242,9 @@ def sample_and_plot(
             ["reco", "sampled"], 
         )
         if device == 0 or type(device) != int:
-            fig_name = f"{var}_reco_sampled_transformed"
+            fig_name = f"{var}_reco_sampled_transformed.png"
             writer.add_figure(fig_name, fig, epoch)
-            comet_logger.log_figure(fig_name, fig, step=epoch)
+            custom_save_png_to_comet(comet_logger, fig, fig_name, epoch)
 
     # plot after preprocessing back
     preprocess_dct = test_loader.dataset.pipelines
@@ -256,9 +273,9 @@ def sample_and_plot(
             ["reco", "sampled"], 
         )
         if device == 0 or type(device) != int:
-            fig_name = f"{var}_reco_sampled"
+            fig_name = f"{var}_reco_sampled.png"
             writer.add_figure(fig_name, fig, epoch)
-            comet_logger.log_figure(fig_name, fig, step=epoch)
+            custom_save_png_to_comet(comet_logger, fig, fig_name, epoch)
 
     # profile plots
     # attach context variables to the reco and sampled dataframes
@@ -283,9 +300,9 @@ def sample_and_plot(
                     samples_back,
                 )
                 if device == 0 or type(device) != int:
-                    fig_name = f"profile_{var}_vs_{cond_var}"
+                    fig_name = f"profile_{var}_vs_{cond_var}.png"
                     writer.add_figure(fig_name, fig, epoch)
-                    comet_logger.log_figure(fig_name, fig, step=epoch)
+                    custom_save_png_to_comet(comet_logger, fig, fig_name, epoch)
 
     # corner plots with target variables
     fig = corner.corner(
@@ -324,6 +341,6 @@ def sample_and_plot(
         fontsize=28,
     )
     if device == 0 or type(device) != int:
-        fig_name = "corner_reco_sampled"
+        fig_name = "corner_reco_sampled.png"
         writer.add_figure(fig_name, fig, epoch)
-        comet_logger.log_figure(fig_name, fig, step=epoch)
+        custom_save_png_to_comet(comet_logger, fig, fig_name, epoch)
